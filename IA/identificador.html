@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Identificador de Aves</title>
+    <style>
+        body { font-family: Arial; text-align: center; margin: 40px; }
+        #status { margin: 20px; color: #555; }
+        #resultado { margin: 20px; font-size: 24px; }
+        button { padding: 10px 20px; font-size: 16px; }
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest"></script>
+    <!-- O arquivo classes.js será gerado depois e colocado aqui -->
+    <script src="classes.js"></script>
+</head>
+<body>
+    <h1>🦅 Que ave é essa?</h1>
+    <input type="file" id="upload" accept="image/*">
+    <div id="status">Carregando modelo...</div>
+    <div id="resultado"></div>
+
+    <script>
+        let model;
+        const statusDiv = document.getElementById('status');
+        const resultadoDiv = document.getElementById('resultado');
+        const MODEL_URL = 'modelo-aves/model.json';
+
+        async function loadModel() {
+            try {
+                statusDiv.innerText = '🔄 Carregando modelo...';
+                model = await tf.loadLayersModel(MODEL_URL);
+                statusDiv.innerText = '✅ Modelo carregado! Envie uma foto.';
+            } catch (error) {
+                statusDiv.innerText = '❌ Erro ao carregar modelo.';
+                console.error(error);
+            }
+        }
+        loadModel();
+
+        document.getElementById('upload').addEventListener('change', async (event) => {
+            const file = event.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = async (e) => {
+                const img = new Image();
+                img.src = e.target.result;
+                img.onload = async () => {
+                    statusDiv.innerText = '🔍 Processando...';
+                    const tensor = tf.browser.fromPixels(img)
+                        .resizeNearestNeighbor([224, 224])
+                        .toFloat()
+                        .div(255.0)
+                        .expandDims(0);
+                    const predictions = await model.predict(tensor).data();
+                    const maxIndex = predictions.indexOf(Math.max(...predictions));
+                    const confidence = (predictions[maxIndex] * 100).toFixed(2);
+                    resultadoDiv.innerHTML = `
+                        <strong>Espécie:</strong> ${CLASS_NAMES[maxIndex]}<br>
+                        <strong>Confiança:</strong> ${confidence}%
+                    `;
+                    statusDiv.innerText = '✅ Pronto.';
+                    tensor.dispose();
+                };
+            };
+            reader.readAsDataURL(file);
+        });
+    </script>
+</body>
+</html>
